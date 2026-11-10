@@ -32,7 +32,7 @@
 
   <section class="hero" aria-live="polite">
     <p class="hero-line" id="hero-line">Loading today&hellip;</p>
-    <p class="aside">This page updates itself every 3 hours. Nobody types these numbers in.</p>
+    <p class="aside" id="hero-updated">&nbsp;</p>
   </section>
 
   <section id="today-view">
@@ -252,6 +252,7 @@ function heroLine(ts) {
 
 function renderToday(ts) {
   $("hero-line").textContent = heroLine(ts);
+  $("hero-updated").textContent = `Updated ${new Date(ts.generated_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })} ET`;
   const iso = todayISO();
   const t = ts.days.find((d) => d.day === iso) || { day: iso };
   const prev = ts.days.filter((d) => d.day < iso);

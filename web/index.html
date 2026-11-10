@@ -15,11 +15,12 @@
       <div class="mark" aria-hidden="true">SV</div>
       <div>
         <h1>Sai Vardhan · Life API</h1>
-        <p><span class="live" id="status">Live from AWS</span></p>
+        <p><span class="live" id="status">Live from AWS</span> <span class="today-date" id="today-date"></span></p>
       </div>
     </div>
     <div class="controls">
       <div class="seg" role="group" aria-label="Date range">
+        <button data-days="today">Today</button>
         <button data-days="7">7D</button>
         <button data-days="14" aria-pressed="true">14D</button>
         <button data-days="30">30D</button>
@@ -31,6 +32,43 @@
 
   <p class="intro">I built a serverless data platform on AWS that tracks my <strong>job search</strong>, <strong>sleep</strong>, <strong>activity</strong> and <strong>screen time</strong>. A Fitbit feeds the Google Health API, my phone reports app usage, and a daily pipeline lands everything in an S3 data lake. Only totals and averages are public.</p>
 
+  <section id="today-view" hidden>
+    <div class="today-head">
+      <h2 id="tv-title">Today</h2>
+      <p class="desc" id="tv-asof">&nbsp;</p>
+    </div>
+    <div class="grid">
+      <article class="card c6">
+        <h2>Sleep last night</h2><p class="desc">Woke up this morning</p>
+        <div class="tv-big" id="tv-sleep">–</div>
+        <div class="stagebar" id="tv-stages"></div>
+        <div class="legend tv-legend" id="tv-stage-legend"></div>
+      </article>
+      <article class="card c6">
+        <h2>Steps so far</h2><p class="desc">Updates every 3 hours from the Fitbit</p>
+        <div class="tv-big" id="tv-steps">–</div>
+        <div class="meter"><span id="tv-steps-bar"></span></div>
+        <p class="desc" id="tv-steps-sub">&nbsp;</p>
+      </article>
+      <article class="card c4">
+        <h2>Resting heart rate</h2>
+        <div class="tv-big" id="tv-rhr">–</div>
+        <p class="desc" id="tv-rhr-sub">&nbsp;</p>
+      </article>
+      <article class="card c4">
+        <h2>Screen time today</h2>
+        <div class="tv-big" id="tv-screen">–</div>
+        <p class="desc" id="tv-screen-sub">&nbsp;</p>
+      </article>
+      <article class="card c4">
+        <h2>Job hunt</h2>
+        <div id="tv-hunt" class="badge" style="margin-top:10px">–</div>
+        <p class="desc" id="tv-hunt-sub" style="margin-top:10px">&nbsp;</p>
+      </article>
+    </div>
+  </section>
+
+  <div id="range-view">
   <section class="tiles" aria-label="Headline numbers">
     <div class="tile"><div class="k">Job hunt today</div><div class="v" id="t-hunt">–</div><div class="sub" id="t-hunt-sub">&nbsp;</div></div>
     <div class="tile"><div class="k">Sleep last night</div><div class="v" id="t-sleep">–</div><div class="sub" id="t-sleep-sub">&nbsp;</div></div>
@@ -81,6 +119,7 @@
     <summary>View the data as a table</summary>
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </details>
+  </div>
 
   <footer>
     <div class="chips">
@@ -99,6 +138,10 @@ const $ = (id) => document.getElementById(id);
 const C = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const hrs = (m) => (m == null ? "–" : (m / 60).toFixed(1));
 const hm = (m) => (m == null ? "–" : `${Math.floor(m / 60)}h ${String(Math.round(m % 60)).padStart(2, "0")}m`);
+const TZ = window.LIFE_TZ || "America/New_York";
+const todayISO = () => new Date().toLocaleDateString("en-CA", { timeZone: TZ });
+$("today-date").textContent = "· " + new Date().toLocaleDateString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", year: "numeric" });
+const updatedText = (ts) => `Updated ${new Date(ts.generated_at).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ET`;
 const avg = (xs) => { const v = xs.filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 
 const SLEEP = [
@@ -176,7 +219,56 @@ function render(ts, summary) {
     ["Resting HR", (d) => d.resting_heart_rate ?? "–"], ["Screen", (d) => hm(d.screen_minutes)], ["Doomscroll", (d) => hm(d.doomscroll_minutes)],
     ["Applied", (d) => (d.applied ? "✓" : "–")]];
   $("tbl").innerHTML = `<thead><tr>${cols.map(([h]) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${[...days].reverse().map((d) => `<tr>${cols.map(([, f]) => `<td>${f(d)}</td>`).join("")}</tr>`).join("")}</tbody>`;
-  $("updated").textContent = `Updated ${new Date(ts.generated_at).toLocaleString()}`;
+  $("updated").textContent = updatedText(ts);
+}
+
+function renderToday(ts) {
+  const iso = todayISO();
+  const t = ts.days.find((d) => d.day === iso) || { day: iso };
+  const prev = ts.days.filter((d) => d.day < iso);
+  const nice = new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  $("tv-title").textContent = `Today · ${nice}`;
+  $("tv-asof").textContent = `As of ${new Date(ts.generated_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })} ${TZ === "America/New_York" ? "ET" : TZ}`;
+
+  // sleep + stages
+  const stages = SLEEP.map((s) => ({ ...s, v: t[{ deep: "deep_sleep_minutes", light: "light_sleep_minutes", rem: "rem_sleep_minutes", awake: "awake_minutes" }[s.key]] }));
+  const inBed = stages.reduce((a, s) => a + (s.v || 0), 0);
+  $("tv-sleep").textContent = t.sleep_minutes == null ? "Not synced yet" : hm(t.sleep_minutes);
+  $("tv-stages").innerHTML = inBed ? stages.filter((s) => s.v).map((s) => `<span style="flex:${s.v};background:${s.color}" title="${s.label}: ${hm(s.v)}"></span>`).join("") : "";
+  $("tv-stage-legend").innerHTML = inBed ? stages.map((s) => `<span><i style="background:${s.color}"></i>${s.label} ${hm(s.v)}</span>`).join("") : `<span>Sleep appears after the watch syncs in the morning</span>`;
+
+  // steps vs 7-day average
+  const avgSteps = avg(prev.slice(-7).map((d) => d.steps));
+  $("tv-steps").textContent = t.steps == null ? "–" : t.steps.toLocaleString();
+  const pct = t.steps != null && avgSteps ? Math.min(100, (t.steps / avgSteps) * 100) : 0;
+  $("tv-steps-bar").style.width = `${pct}%`;
+  $("tv-steps-sub").textContent = avgSteps ? (t.steps == null ? `7-day average ${Math.round(avgSteps).toLocaleString()}` : `${Math.round((t.steps / avgSteps) * 100)}% of my 7-day average (${Math.round(avgSteps).toLocaleString()})`) : " ";
+
+  // resting HR
+  const rhrAvg = avg(prev.slice(-7).map((d) => d.resting_heart_rate));
+  $("tv-rhr").textContent = t.resting_heart_rate == null ? "–" : `${t.resting_heart_rate} bpm`;
+  $("tv-rhr-sub").textContent = rhrAvg ? `7-day average ${Math.round(rhrAvg)} bpm` : " ";
+
+  // screen time
+  $("tv-screen").textContent = t.screen_minutes == null ? "–" : hm(t.screen_minutes);
+  $("tv-screen-sub").textContent = t.screen_minutes == null ? "Syncs from my Android app every 6 hours" : `${hm(t.doomscroll_minutes || 0)} of it doomscrolling`;
+
+  // job hunt
+  const h = ts.job_hunt;
+  $("tv-hunt").className = `badge ${h.applied_today ? "done" : ""}`;
+  $("tv-hunt").textContent = h.applied_today ? "✓ Applied today" : "○ Not yet today";
+  $("tv-hunt-sub").textContent = h.streak_days ? `${h.streak_days}-day streak` : "No active streak";
+  $("updated").textContent = updatedText(ts);
+}
+
+async function loadToday() {
+  try {
+    const ts = await fetch(`${API}/public/timeseries?days=8`).then((r) => { if (!r.ok) throw r.status; return r.json(); });
+    renderToday(ts);
+  } catch (e) {
+    $("status").textContent = "API unreachable";
+    $("status").classList.add("err");
+  }
 }
 
 async function load(range) {
@@ -195,7 +287,10 @@ async function load(range) {
 document.querySelectorAll(".seg button").forEach((b) =>
   b.addEventListener("click", () => {
     document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    load(Number(b.dataset.days));
+    const today = b.dataset.days === "today";
+    $("today-view").hidden = !today;
+    $("range-view").hidden = today;
+    if (today) loadToday(); else load(Number(b.dataset.days));
   }),
 );
 load(14);

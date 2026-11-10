@@ -61,8 +61,8 @@ def test_export_applications_snapshot(repo, lake, s3, client, auth):
 
 
 def test_days_from_event():
-    y = date(2026, 11, 9)
-    assert _days_from_event({}, y) == [y]
+    y = date(2026, 11, 9)  # today
+    assert _days_from_event({}, y) == [date(2026, 11, 8), y]
     assert _days_from_event({"date": "2026-01-02"}, y) == [date(2026, 1, 2)]
     assert _days_from_event({"backfill_days": 3}, y) == [date(2026, 11, 7), date(2026, 11, 8), y]
     with pytest.raises(ValueError):

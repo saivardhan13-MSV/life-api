@@ -229,7 +229,7 @@ resource "aws_iam_role_policy" "scheduler" {
 
 resource "aws_scheduler_schedule" "daily_ingest" {
   name                         = "${local.name}-daily-ingest"
-  schedule_expression          = "cron(0 9 * * ? *)" # 09:00 local, after the watch has synced overnight sleep
+  schedule_expression          = "cron(0 */3 * * ? *)" # every 3h local: yesterday final + today so far
   schedule_expression_timezone = var.timezone
 
   flexible_time_window {

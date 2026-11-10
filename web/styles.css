@@ -134,3 +134,15 @@ footer { margin-top: 28px; color: var(--muted); font-size: 0.8rem; display: flex
 .dot.on { background: var(--s1); border-color: var(--s1); }
 .tile .v .ok { color: var(--good); }
 .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+
+/* today view */
+.today-date { color: var(--muted); font-size: 0.78rem; margin-left: 6px; }
+.today-head { margin: 4px 0 14px; }
+.today-head h2 { font-size: clamp(1.3rem, 3vw, 1.7rem); margin: 0; letter-spacing: -0.02em; }
+.tv-big { font-size: clamp(1.8rem, 4vw, 2.4rem); font-weight: 650; letter-spacing: -0.03em; margin: 8px 0 12px; }
+.stagebar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+.stagebar span { display: block; height: 100%; }
+.tv-legend { margin-top: 12px; }
+.meter { height: 10px; border-radius: 4px; background: var(--surface-2); overflow: hidden; margin-bottom: 8px; }
+.meter span { display: block; height: 100%; background: var(--s1); border-radius: 0 4px 4px 0; width: 0; transition: width 0.4s ease; }
+[hidden] { display: none !important; }

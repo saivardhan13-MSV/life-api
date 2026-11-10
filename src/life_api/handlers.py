@@ -3,9 +3,9 @@
 * ``api_handler``    - API Gateway HTTP API -> FastAPI (via Mangum)
 * ``ingest_handler`` - EventBridge Scheduler, daily. Event options::
 
-      {}                          ingest yesterday (local time)
+      {}                          ingest yesterday + today so far (local time)
       {"date": "2026-11-01"}      ingest one day
-      {"backfill_days": 14}       ingest the last N days
+      {"backfill_days": 14}       ingest the last N days, ending today
 """
 
 from __future__ import annotations
@@ -53,13 +53,14 @@ log = logging.getLogger(__name__)
 api_handler = Mangum(create_app(), lifespan="off")
 
 
-def _days_from_event(event: dict[str, Any], yesterday: date) -> list[date]:
+def _days_from_event(event: dict[str, Any], today: date) -> list[date]:
     if event.get("date"):
         return [date.fromisoformat(event["date"])]
-    n = int(event.get("backfill_days", 1))
+    # Default: yesterday (final numbers) + today (partial, refreshed on every run).
+    n = int(event.get("backfill_days", 2))
     if not 1 <= n <= 90:
         raise ValueError("backfill_days must be between 1 and 90")
-    return [yesterday - timedelta(days=i) for i in range(n - 1, -1, -1)]
+    return [today - timedelta(days=i) for i in range(n - 1, -1, -1)]
 
 
 def ingest_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -72,7 +73,7 @@ def ingest_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     lake = Lake.from_settings(settings)
     repo = LifeRepository.from_settings(settings)
 
-    days = _days_from_event(event or {}, settings.yesterday())
+    days = _days_from_event(event or {}, settings.today())
     results = [ingest_health_day(d, client, lake, repo).model_dump(mode="json") for d in days]
     app_count = export_applications_snapshot(settings.today(), lake, repo)
     log.info("ingest complete", extra={"days": len(results), "applications": app_count})

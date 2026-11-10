@@ -1,0 +1,5 @@
+alert_email = "you@example.com"
+timezone    = "America/New_York"
+github_repo = "your-github-username/life-api"
+# monthly_budget_usd = 5
+# create_github_oidc_provider = false   # if your account already has it

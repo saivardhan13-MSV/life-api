@@ -1,0 +1,16 @@
+package,app_name,category,is_doomscroll
+com.instagram.android,Instagram,social,true
+com.instagram.barcelona,Threads,social,true
+com.zhiliaoapp.musically,TikTok,short_video,true
+com.ss.android.ugc.trill,TikTok,short_video,true
+com.google.android.youtube,YouTube,video,true
+com.reddit.frontpage,Reddit,social,true
+com.twitter.android,X,social,true
+com.facebook.katana,Facebook,social,true
+com.snapchat.android,Snapchat,social,true
+com.pinterest,Pinterest,social,true
+com.linkedin.android,LinkedIn,job_search,false
+com.google.android.gm,Gmail,productivity,false
+com.whatsapp,WhatsApp,messaging,false
+com.android.chrome,Chrome,browser,false
+com.spotify.music,Spotify,music,false

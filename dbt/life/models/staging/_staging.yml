@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_daily_health
+    description: Deduplicated daily wearable metrics. Sleep is attributed to the wake-up date.
+    columns:
+      - name: activity_date
+        tests: [unique, not_null]
+      - name: sleep_minutes
+        description: Minutes actually asleep in the main sleep session.
+
+  - name: stg_screen_time
+    description: Per-app daily usage from the latest upload, enriched with app categories.
+    columns:
+      - name: activity_date
+        tests: [not_null]
+      - name: package
+        tests: [not_null]
+      - name: minutes
+        tests: [not_null]
+
+  - name: stg_applications
+    description: Current state of every job application.
+    columns:
+      - name: application_id
+        tests: [unique, not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: [applied, screening, interviewing, offer, rejected, ghosted, withdrawn]
+      - name: applied_date
+        tests: [not_null]

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life API · Live</title>
+<meta name="description" content="Live stats from a personal data platform on AWS: job applications, sleep, steps and screen time.">
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #f7f6f3; --surface: #ffffff; --text: #1b1b1a; --muted: #6b6a66;
+    --line: #e4e2dc; --accent: #2f6f5e; --warn: #a35a1f;
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121211; --surface: #1b1b1a; --text: #ecebe7; --muted: #9a9892;
+            --line: #2c2c2a; --accent: #7cc4ac; --warn: #e0a06a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font);
+         line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  main { max-width: 880px; margin: 0 auto; padding: 56px 16px 40px; }
+  header p { color: var(--muted); margin: 6px 0 0; max-width: 56ch; }
+  h1 { font-size: clamp(1.8rem, 4vw, 2.4rem); letter-spacing: -0.02em; margin: 0; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font: 500 0.8rem var(--mono);
+          color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+  .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .hero { margin: 40px 0 8px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .hero .n { font: 600 clamp(3.5rem, 12vw, 6rem)/1 var(--font); letter-spacing: -0.04em;
+             font-variant-numeric: tabular-nums; }
+  .hero .l { color: var(--muted); font-size: 1.1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          border-top: 1px solid var(--line); margin-top: 32px; }
+  .stat { padding: 20px 16px 20px 0; border-bottom: 1px solid var(--line); }
+  .stat .v { font: 600 1.9rem/1.1 var(--font); font-variant-numeric: tabular-nums; }
+  .stat .k { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+  h2 { font-size: 0.8rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 44px 0 0; font-weight: 500; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+  footer code { font-family: var(--mono); }
+  .err { color: var(--warn); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="live" id="status">Live from AWS</div>
+    <h1>My job search, sleep and screen time, live from my own data</h1>
+    <p>A serverless data platform I built: a Fitbit feeds the Google Health API, my phone uploads screen time, and a FastAPI app on AWS Lambda tracks every application. Only totals and averages are shown here.</p>
+  </header>
+
+  <div class="hero"><span class="n" id="applications_total">–</span><span class="l">applications sent</span></div>
+
+  <h2>Job search</h2>
+  <div class="grid">
+    <div class="stat"><div class="v" id="applications_today">–</div><div class="k">today</div></div>
+    <div class="stat"><div class="v" id="applications_this_week">–</div><div class="k">this week</div></div>
+    <div class="stat"><div class="v" id="applications_last_30_days">–</div><div class="k">last 30 days</div></div>
+    <div class="stat"><div class="v" id="interviews_total">–</div><div class="k">interviews</div></div>
+  </div>
+
+  <h2>Body &amp; habits · 7-day average</h2>
+  <div class="grid">
+    <div class="stat"><div class="v" id="last_night_sleep_hours">–</div><div class="k">sleep last night</div></div>
+    <div class="stat"><div class="v" id="avg_sleep_hours_7d">–</div><div class="k">avg sleep</div></div>
+    <div class="stat"><div class="v" id="avg_steps_7d">–</div><div class="k">avg steps</div></div>
+    <div class="stat"><div class="v" id="avg_doomscroll_hours_7d">–</div><div class="k">avg doomscrolling</div></div>
+  </div>
+
+  <footer>
+    <p id="updated"></p>
+    <p>Stack: Python · FastAPI · AWS Lambda · API Gateway · DynamoDB · S3 · Athena · dbt · Terraform · GitHub Actions.
+       Data: <code>GET /public/summary</code>.</p>
+  </footer>
+</main>
+<script>
+  const fmt = {
+    hours: (v) => v == null ? "–" : `${v}h`,
+    int: (v) => v == null ? "–" : Number(v).toLocaleString(),
+  };
+  const fields = {
+    applications_total: fmt.int, applications_today: fmt.int, applications_this_week: fmt.int,
+    applications_last_30_days: fmt.int, interviews_total: fmt.int,
+    last_night_sleep_hours: fmt.hours, avg_sleep_hours_7d: fmt.hours,
+    avg_steps_7d: fmt.int, avg_doomscroll_hours_7d: fmt.hours,
+  };
+  async function load() {
+    const base = (window.LIFE_API_URL || "").replace(/\/$/, "");
+    try {
+      const r = await fetch(`${base}/public/summary`);
+      if (!r.ok) throw new Error(r.status);
+      const s = await r.json();
+      for (const [id, f] of Object.entries(fields)) document.getElementById(id).textContent = f(s[id]);
+      document.getElementById("updated").textContent =
+        `Updated ${new Date(s.generated_at).toLocaleString()} · ${s.days_tracked} days tracked`;
+    } catch (e) {
+      const el = document.getElementById("status");
+      el.textContent = "API unreachable"; el.classList.add("err");
+    }
+  }
+  load();
+</script>
+</body>
+</html>

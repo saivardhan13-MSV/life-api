@@ -1,0 +1,42 @@
+name: dbt build
+
+# Runs after the 09:00 ingest. GitHub-hosted runners are free for public repos,
+# so the transformation layer costs nothing beyond Athena's per-query pennies.
+on:
+  schedule:
+    - cron: "0 15 * * *" # 15:00 UTC
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  dbt:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dbt/life
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      DBT_ATHENA_STAGING_DIR: ${{ vars.DBT_ATHENA_STAGING_DIR }}
+      DBT_ATHENA_DATA_DIR: ${{ vars.DBT_ATHENA_DATA_DIR }}
+      DBT_ATHENA_WORKGROUP: ${{ vars.DBT_ATHENA_WORKGROUP || 'life-api-prod' }}
+      DBT_ATHENA_SCHEMA: ${{ vars.DBT_ATHENA_SCHEMA || 'life_api_prod_curated' }}
+      DBT_CLEAN_SCHEMA: ${{ vars.DBT_CLEAN_SCHEMA || 'life_api_prod_clean' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install dbt-athena-community
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DBT_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: dbt build --profiles-dir .
+      - run: dbt docs generate --profiles-dir .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: dbt/life/target

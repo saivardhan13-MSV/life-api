@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: clean
+    description: Flattened JSONL written by the Lambdas. Tables are defined in Terraform (Glue) with partition projection on `dt`.
+    schema: "{{ env_var('DBT_CLEAN_SCHEMA', 'life_api_clean') }}"
+    tables:
+      - name: daily_health
+        description: One row per day per ingest run, from the Google Health API (Fitbit).
+      - name: screen_time
+        description: One row per app per day, uploaded from the phone.
+      - name: applications
+        description: Daily full snapshot of the job application tracker.

@@ -1,0 +1,26 @@
+name: life
+version: "1.0.0"
+config-version: 2
+profile: life
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+  life:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table
+      +format: parquet
+      +write_compression: snappy
+
+seeds:
+  life:
+    app_categories:
+      +column_types:
+        package: varchar
+        app_name: varchar
+        category: varchar
+        is_doomscroll: boolean

@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/terraform.tfvars
+infra/terraform/.terraform.lock.hcl.bak
+
+# dbt
+dbt/life/target/
+dbt/life/logs/
+dbt/life/dbt_packages/
+
+# local secrets from the OAuth helper
+.google_health_token.json
+infra/terraform/tfplan
+.claude/
+web/config.js

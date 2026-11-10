@@ -32,7 +32,7 @@
 
   <section class="hero" aria-live="polite">
     <p class="hero-line" id="hero-line">Loading today&hellip;</p>
-    <p class="aside" id="hero-updated">&nbsp;</p>
+    <p class="aside" id="hero-context">&nbsp;</p>
   </section>
 
   <section id="today-view">
@@ -250,9 +250,38 @@ function heroLine(ts) {
   return parts.join(" ");
 }
 
+// Today vs my own history. Only states things that are strictly true of the data.
+function contextLine(ts) {
+  const iso = todayISO();
+  const t = ts.days.find((d) => d.day === iso) || {};
+  const nights = ts.days.filter((d) => d.day < iso && d.sleep_minutes != null).reverse(); // newest first
+  const short = (iso) => fmtDay(iso, { month: "short", day: "numeric" });
+  const dur = (m) => (m >= 60 ? hm(m) : `${Math.round(m)} min`);
+  const parts = [];
+
+  if (t.sleep_minutes != null && nights.length >= 3) {
+    const longer = nights.findIndex((d) => d.sleep_minutes >= t.sleep_minutes);
+    const shorter = nights.findIndex((d) => d.sleep_minutes <= t.sleep_minutes);
+    if (longer === -1) parts.push(`Longest sleep in ${nights.length + 1} nights.`);
+    else if (longer >= 3) parts.push(`Longest sleep since ${short(nights[longer].day)}.`);
+    else if (shorter === -1) parts.push(`Shortest night in ${nights.length + 1} nights.`);
+    else if (shorter >= 3) parts.push(`Shortest night since ${short(nights[shorter].day)}.`);
+    else {
+      const wk = avg(nights.slice(0, 7).map((d) => d.sleep_minutes));
+      const diff = t.sleep_minutes - wk;
+      parts.push(Math.abs(diff) < 15 ? "Right on my usual sleep." : `${dur(Math.abs(diff))} ${diff > 0 ? "more" : "less"} sleep than my weekly average.`);
+    }
+  }
+  const stepAvg = avg(ts.days.filter((d) => d.day < iso).slice(-7).map((d) => d.steps));
+  if (t.steps != null && stepAvg && t.steps >= stepAvg) parts.push("Already past my daily step average.");
+  const streak = ts.job_hunt.streak_days;
+  if ([7, 14, 30, 60, 100].includes(streak)) parts.push(`${streak}-day application streak.`);
+  return parts.join(" ") || " ";
+}
+
 function renderToday(ts) {
   $("hero-line").textContent = heroLine(ts);
-  $("hero-updated").textContent = `Updated ${new Date(ts.generated_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })} ET`;
+  $("hero-context").textContent = contextLine(ts);
   const iso = todayISO();
   const t = ts.days.find((d) => d.day === iso) || { day: iso };
   const prev = ts.days.filter((d) => d.day < iso);
@@ -293,7 +322,7 @@ function renderToday(ts) {
 
 async function loadToday() {
   try {
-    const ts = await fetch(`${API}/public/timeseries?days=8`).then((r) => { if (!r.ok) throw r.status; return r.json(); });
+    const ts = await fetch(`${API}/public/timeseries?days=60`).then((r) => { if (!r.ok) throw r.status; return r.json(); });
     renderToday(ts);
   } catch (e) {
     $("status").textContent = "API unreachable";

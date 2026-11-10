@@ -151,7 +151,7 @@ footer { margin-top: 28px; color: var(--muted); font-size: 0.8rem; display: flex
 /* hero */
 .hero { margin: 6px 0 26px; }
 .hero-line { font-size: clamp(1.7rem, 4.6vw, 2.8rem); font-weight: 650; letter-spacing: -0.035em; line-height: 1.12; margin: 0; max-width: 30ch; text-wrap: pretty; }
-.aside { margin: 12px 0 0; color: var(--muted); font-size: 0.88rem; }
+.aside { margin: 12px 0 0; color: var(--ink-2); font-size: clamp(1rem, 2vw, 1.15rem); }
 
 /* api box */
 .api-box { margin-top: 12px; }

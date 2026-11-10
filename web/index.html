@@ -30,7 +30,10 @@
     </div>
   </header>
 
-  <p class="intro">I built a serverless data platform on AWS that tracks my <strong>job search</strong>, <strong>sleep</strong>, <strong>activity</strong> and <strong>screen time</strong>. A Fitbit feeds the Google Health API, my phone reports app usage, and a daily pipeline lands everything in an S3 data lake. Only totals and averages are public.</p>
+  <section class="hero" aria-live="polite">
+    <p class="hero-line" id="hero-line">Loading today&hellip;</p>
+    <p class="aside">This page updates itself every 3 hours. Nobody types these numbers in.</p>
+  </section>
 
   <section id="today-view">
     <div class="today-head">
@@ -79,7 +82,7 @@
   <section class="grid">
     <article class="card c12">
       <div class="head">
-        <div><h2>Sleep by stage</h2><p class="desc">Hours asleep per night, attributed to the morning I woke up</p></div>
+        <div><h2>Sleep by stage</h2><p class="desc">Hours per night</p></div>
         <div class="legend" id="lg-sleep"></div>
       </div>
       <div class="chart" id="ch-sleep"></div>
@@ -96,13 +99,13 @@
 
     <article class="card c8">
       <div class="head">
-        <div><h2>Screen time</h2><p class="desc">Hours per day. Infinite-feed apps (Instagram, YouTube, Reddit…) count as doomscrolling</p></div>
+        <div><h2>Screen time</h2><p class="desc">Hours per day · doomscrolling = Instagram, YouTube, Reddit and similar</p></div>
         <div class="legend" id="lg-screen"></div>
       </div>
       <div class="chart" id="ch-screen"></div>
     </article>
     <article class="card c4">
-      <div class="head"><div><h2>Job hunt</h2><p class="desc">Did I apply somewhere that day? A habit, not a scoreboard</p></div></div>
+      <div class="head"><div><h2>Days I applied</h2><p class="desc">One dot per day</p></div></div>
       <div id="hunt-badge" class="badge">–</div>
       <p class="streak" id="hunt-streak">&nbsp;</p>
       <div class="dots" id="hunt-dots" aria-label="Days with applications"></div>
@@ -110,7 +113,7 @@
     </article>
 
     <article class="card c12">
-      <h2>What the data says</h2><p class="desc">Computed from the selected range</p>
+      <h2>Notes</h2><p class="desc">From the selected range</p>
       <div id="insights" class="insights"></div>
     </article>
   </section>
@@ -120,6 +123,18 @@
     <div class="tbl-wrap"><table id="tbl"></table></div>
   </details>
   </div>
+
+  <section class="card api-box" aria-labelledby="api-h">
+    <div class="head">
+      <div><h2 id="api-h">This page is an API</h2><p class="desc">Everything above comes from one public endpoint. Run it yourself.</p></div>
+      <div class="controls">
+        <button class="btn primary" id="run-api" type="button">Run it</button>
+        <a class="btn" id="api-docs" href="#">API docs ↗</a>
+      </div>
+    </div>
+    <pre class="term"><span class="prompt">$</span> curl <span id="api-url"></span>/public/summary
+<code id="api-out" class="out">Press "Run it" to call the live API.</code></pre>
+  </section>
 
   <footer>
     <div class="chips">
@@ -222,13 +237,27 @@ function render(ts, summary) {
   $("updated").textContent = updatedText(ts);
 }
 
+function heroLine(ts) {
+  const t = ts.days.find((d) => d.day === todayISO()) || {};
+  const h = ts.job_hunt;
+  const parts = [];
+  if (t.sleep_minutes != null) parts.push(`Slept ${hm(t.sleep_minutes)}.`);
+  if (t.steps != null) parts.push(`${t.steps.toLocaleString()} steps so far.`);
+  if (h.streak_days > 1) parts.push(`Day ${h.streak_days} of applying.`);
+  else if (h.applied_today) parts.push("Applied to a job today.");
+  else parts.push("No applications yet today.");
+  if (t.doomscroll_minutes) parts.push(`${hm(t.doomscroll_minutes)} lost to scrolling.`);
+  return parts.join(" ");
+}
+
 function renderToday(ts) {
+  $("hero-line").textContent = heroLine(ts);
   const iso = todayISO();
   const t = ts.days.find((d) => d.day === iso) || { day: iso };
   const prev = ts.days.filter((d) => d.day < iso);
   const nice = new Date(iso + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   $("tv-title").textContent = `Today · ${nice}`;
-  $("tv-asof").textContent = `As of ${new Date(ts.generated_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })} ${TZ === "America/New_York" ? "ET" : TZ}`;
+  $("tv-asof").textContent = `· as of ${new Date(ts.generated_at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" })} ${TZ === "America/New_York" ? "ET" : TZ}`;
 
   // sleep + stages
   const stages = SLEEP.map((s) => ({ ...s, v: t[{ deep: "deep_sleep_minutes", light: "light_sleep_minutes", rem: "rem_sleep_minutes", awake: "awake_minutes" }[s.key]] }));
@@ -293,6 +322,22 @@ document.querySelectorAll(".seg button").forEach((b) =>
     if (today) loadToday(); else load(Number(b.dataset.days));
   }),
 );
+$("api-url").textContent = API;
+$("api-docs").href = `${API}/docs`;
+$("run-api").addEventListener("click", async () => {
+  const out = $("api-out");
+  out.textContent = "…";
+  const t0 = performance.now();
+  try {
+    const r = await fetch(`${API}/public/summary`, { cache: "no-store" });
+    const body = await r.json();
+    out.textContent = `${JSON.stringify(body, null, 2)}
+
+# HTTP ${r.status} in ${Math.round(performance.now() - t0)} ms, served by AWS Lambda`;
+  } catch (e) {
+    out.textContent = "Request failed. The API may be cold-starting; try again.";
+  }
+});
 loadToday();
 </script>
 </body>

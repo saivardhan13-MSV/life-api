@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My Applications · Life API</title>
+<link rel="stylesheet" href="styles.css">
+<script src="config.js"></script>
+<style>
+  .lock { max-width: 420px; margin: 12vh auto 0; }
+  .field { display: grid; gap: 6px; font-size: 0.82rem; color: var(--ink-2); }
+  .field input, .field select, .field textarea, .inp {
+    background: var(--page); border: 1px solid var(--ring); border-radius: 9px; padding: 9px 11px; color: var(--ink); width: 100%;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus, .inp:focus { outline: 2px solid var(--s1); outline-offset: 1px; }
+  .form { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+  .form .w2 { grid-column: span 2; } .form .w3 { grid-column: span 3; } .form .w6 { grid-column: span 6; }
+  .row-actions { display: flex; gap: 8px; justify-content: flex-end; grid-column: span 6; }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .bar .inp { width: auto; flex: 1 1 220px; }
+  .apps td, .apps th { text-align: left; }
+  .apps td.num { text-align: right; }
+  .apps select { background: var(--surface-2); border: 1px solid var(--ring); border-radius: 7px; padding: 4px 6px; color: var(--ink); }
+  .co { color: var(--ink); font-weight: 600; }
+  .del { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+  .del:hover { color: var(--critical); background: rgba(208, 59, 59, 0.1); }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #262624; border: 1px solid var(--ring); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; display: none; z-index: 60; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; border: 1px solid var(--ring); color: var(--ink-2); }
+  @media (max-width: 700px) { .form .w2, .form .w3 { grid-column: span 6; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">SV</div>
+      <div><h1>My applications</h1><p>Private · not visible on the public dashboard</p></div>
+    </div>
+    <div class="controls">
+      <a class="btn" href="./">Public dashboard</a>
+      <button class="btn" id="logout" hidden>Lock</button>
+    </div>
+  </header>
+
+  <section id="locked" class="card lock">
+    <h2>Unlock</h2>
+    <p class="desc">Enter your API key. It stays in this browser tab only and is cleared when you close it.</p>
+    <form id="unlock" class="field" style="gap:10px">
+      <input id="key" type="password" autocomplete="current-password" placeholder="API key" required>
+      <button class="btn primary" type="submit">Unlock</button>
+      <span id="unlock-err" style="color:var(--critical)"></span>
+    </form>
+  </section>
+
+  <main id="app" hidden>
+    <section class="tiles">
+      <div class="tile"><div class="k">Total</div><div class="v" id="m-total">0</div></div>
+      <div class="tile"><div class="k">Today</div><div class="v" id="m-today">0</div></div>
+      <div class="tile"><div class="k">In progress</div><div class="v" id="m-active">0</div><div class="sub">screening + interviewing</div></div>
+      <div class="tile"><div class="k">Response rate</div><div class="v" id="m-rate">–</div><div class="sub">moved past "applied"</div></div>
+    </section>
+
+    <article class="card" style="margin-bottom:12px">
+      <h2>Log an application</h2><p class="desc">Company and role are required. The date defaults to today.</p>
+      <form id="add" class="form">
+        <label class="field w3">Company<input name="company" required maxlength="200"></label>
+        <label class="field w3">Role<input name="role" required maxlength="200" placeholder="e.g. Data Engineer I"></label>
+        <label class="field w2">Location<input name="location" maxlength="200" placeholder="Remote · Seattle, WA"></label>
+        <label class="field w2">Applied on<input name="applied_on" type="date"></label>
+        <label class="field w2">Source
+          <select name="source"><option>jobright</option><option>linkedin</option><option>company site</option><option>referral</option><option>other</option></select>
+        </label>
+        <label class="field w6">Job URL<input name="url" type="url" placeholder="https://"></label>
+        <label class="field w6">Notes<textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+        <div class="row-actions"><button class="btn primary" type="submit">Add application</button></div>
+      </form>
+    </article>
+
+    <article class="card">
+      <div class="bar">
+        <input class="inp" id="q" type="search" placeholder="Search company or role">
+        <select class="inp" id="f-status" style="flex:0 0 auto">
+          <option value="">All statuses</option>
+        </select>
+        <span class="pill" id="count"></span>
+      </div>
+      <div class="tbl-wrap" style="padding:0">
+        <table class="apps">
+          <thead><tr><th>Applied</th><th>Company</th><th>Role</th><th>Location</th><th>Source</th><th>Status</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </article>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const API = (window.LIFE_API_URL || "").replace(/\/$/, "");
+const STATUSES = ["applied", "screening", "interviewing", "offer", "rejected", "ghosted", "withdrawn"];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let apps = [];
+
+const store = {
+  get() { try { return sessionStorage.getItem("lifeApiKey"); } catch { return null; } },
+  set(v) { try { sessionStorage.setItem("lifeApiKey", v); } catch {} },
+  clear() { try { sessionStorage.removeItem("lifeApiKey"); } catch {} },
+};
+let KEY = store.get();
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.style.display = "block";
+  clearTimeout(toast.h); toast.h = setTimeout(() => (t.style.display = "none"), 2400);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, { ...opts, headers: { "X-API-Key": KEY, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  if (r.status === 401) { lock(); throw new Error("Invalid API key"); }
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(typeof b.detail === "string" ? b.detail : `Error ${r.status}`); }
+  return r.status === 204 ? null : r.json();
+}
+
+function lock() { store.clear(); KEY = null; $("app").hidden = true; $("locked").hidden = false; $("logout").hidden = true; }
+
+async function unlock(k) {
+  KEY = k;
+  try {
+    apps = await api("/v1/applications");
+    store.set(k);
+    $("locked").hidden = true; $("app").hidden = false; $("logout").hidden = false; $("unlock-err").textContent = "";
+    render();
+  } catch (e) { $("unlock-err").textContent = e.message; }
+}
+
+// Match the API, which counts "today" in its configured timezone, not the browser's.
+function today() { return new Date().toLocaleDateString("en-CA", { timeZone: window.LIFE_TZ || "America/New_York" }); }
+
+function render() {
+  const q = $("q").value.trim().toLowerCase();
+  const fs = $("f-status").value;
+  const shown = apps.filter((a) => (!fs || a.status === fs) && (!q || `${a.company} ${a.role}`.toLowerCase().includes(q)));
+  $("rows").innerHTML = shown.length ? shown.map((a) => `
+    <tr>
+      <td>${esc(a.applied_on)}</td>
+      <td class="co">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.company)}</a>` : esc(a.company)}</td>
+      <td>${esc(a.role)}</td>
+      <td>${esc(a.location || "–")}</td>
+      <td>${esc(a.source)}</td>
+      <td><select data-id="${a.id}" aria-label="Status for ${esc(a.company)}">${STATUSES.map((s) => `<option ${s === a.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+      <td class="num"><button class="del" data-del="${a.id}" title="Delete" aria-label="Delete ${esc(a.company)}">✕</button></td>
+    </tr>`).join("") : `<tr><td colspan="7" style="color:var(--muted);padding:18px 10px">No applications yet. Log your first one above.</td></tr>`;
+  $("count").textContent = `${shown.length} of ${apps.length}`;
+  $("m-total").textContent = apps.length;
+  $("m-today").textContent = apps.filter((a) => a.applied_on === today()).length;
+  $("m-active").textContent = apps.filter((a) => a.status === "screening" || a.status === "interviewing").length;
+  const moved = apps.filter((a) => ["screening", "interviewing", "offer"].includes(a.status)).length;
+  $("m-rate").textContent = apps.length ? `${Math.round((moved / apps.length) * 100)}%` : "–";
+}
+
+$("f-status").innerHTML += STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
+$("unlock").addEventListener("submit", (e) => { e.preventDefault(); unlock($("key").value.trim()); });
+$("logout").addEventListener("click", lock);
+$("q").addEventListener("input", render);
+$("f-status").addEventListener("change", render);
+
+$("add").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = Object.fromEntries([...new FormData(e.target)].filter(([, v]) => String(v).trim() !== ""));
+  try {
+    const app = await api("/v1/applications", { method: "POST", body: JSON.stringify(body) });
+    apps.unshift(app); e.target.reset(); render(); toast(`Added ${app.company}`);
+  } catch (err) { toast(err.message); }
+});
+
+$("rows").addEventListener("change", async (e) => {
+  const id = e.target.dataset.id; if (!id) return;
+  try {
+    const app = await api(`/v1/applications/${id}`, { method: "PATCH", body: JSON.stringify({ status: e.target.value }) });
+    apps = apps.map((a) => (a.id === id ? app : a)); render(); toast(`${app.company} → ${app.status}`);
+  } catch (err) { toast(err.message); }
+});
+
+$("rows").addEventListener("click", async (e) => {
+  const id = e.target.dataset.del; if (!id) return;
+  const a = apps.find((x) => x.id === id);
+  if (!confirm(`Delete the application to ${a.company}? This can't be undone.`)) return;
+  try { await api(`/v1/applications/${id}`, { method: "DELETE" }); apps = apps.filter((x) => x.id !== id); render(); toast("Deleted"); }
+  catch (err) { toast(err.message); }
+});
+
+if (KEY) unlock(KEY);
+</script>
+</body>
+</html>

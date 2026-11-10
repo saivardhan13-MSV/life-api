@@ -108,3 +108,25 @@ class ScrollSleepInsight(BaseModel):
     avg_sleep_hours_low_scroll: float | None
     difference_minutes: float | None
     message: str
+
+
+class PublicDay(BaseModel):
+    """One day on the public dashboard. Counts and health metrics only."""
+
+    day: date
+    sleep_minutes: int | None = None
+    deep_sleep_minutes: int | None = None
+    light_sleep_minutes: int | None = None
+    rem_sleep_minutes: int | None = None
+    awake_minutes: int | None = None
+    steps: int | None = None
+    resting_heart_rate: int | None = None
+    screen_minutes: float | None = None
+    doomscroll_minutes: float | None = None
+    applications_sent: int = 0
+
+
+class PublicTimeseries(BaseModel):
+    generated_at: datetime
+    days: list[PublicDay]
+    status_counts: dict[str, int]

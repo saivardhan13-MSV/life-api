@@ -73,19 +73,34 @@ resource "aws_s3_bucket_policy" "site" {
   policy = data.aws_iam_policy_document.site.json
 }
 
-resource "aws_s3_object" "index" {
+locals {
+  site_files = {
+    "index.html" = "text/html; charset=utf-8"
+    "me.html"    = "text/html; charset=utf-8"
+    "styles.css" = "text/css; charset=utf-8"
+    "charts.js"  = "application/javascript"
+  }
+}
+
+resource "aws_s3_object" "site" {
+  for_each      = local.site_files
   bucket        = aws_s3_bucket.site.id
-  key           = "index.html"
-  source        = "${path.module}/../../web/index.html"
-  etag          = filemd5("${path.module}/../../web/index.html")
-  content_type  = "text/html; charset=utf-8"
-  cache_control = "public, max-age=300"
+  key           = each.key
+  source        = "${path.module}/../../web/${each.key}"
+  etag          = filemd5("${path.module}/../../web/${each.key}")
+  content_type  = each.value
+  cache_control = "public, max-age=60"
+}
+
+moved {
+  from = aws_s3_object.index
+  to   = aws_s3_object.site["index.html"]
 }
 
 resource "aws_s3_object" "config" {
   bucket        = aws_s3_bucket.site.id
   key           = "config.js"
-  content       = "window.LIFE_API_URL = ${jsonencode(aws_apigatewayv2_stage.default.invoke_url)};\n"
+  content       = "window.LIFE_API_URL = ${jsonencode(aws_apigatewayv2_stage.default.invoke_url)};\nwindow.LIFE_TZ = ${jsonencode(var.timezone)};\n"
   content_type  = "application/javascript"
   cache_control = "public, max-age=300"
 }

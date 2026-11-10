@@ -9,7 +9,9 @@ from life_api.domain import (
     Application,
     ApplicationStatus,
     DaySummary,
+    PublicDay,
     PublicSummary,
+    PublicTimeseries,
     ScrollSleepInsight,
 )
 
@@ -103,3 +105,26 @@ def scroll_vs_sleep(days: list[DaySummary]) -> ScrollSleepInsight:
         difference_minutes=diff,
         message=message,
     )
+
+
+def build_public_timeseries(
+    apps: list[Application], days: list[DaySummary], start: date, end: date
+) -> PublicTimeseries:
+    """Every calendar day in ``[start, end]`` (gaps included), plus a status funnel."""
+    by_day = {d.day: d for d in days}
+    sent: dict[date, int] = {}
+    for a in apps:
+        sent[a.applied_on] = sent.get(a.applied_on, 0) + 1
+
+    rows = []
+    d = start
+    while d <= end:
+        known = by_day.get(d)
+        fields = known.model_dump(exclude={"day"}) if known else {}
+        rows.append(PublicDay(day=d, applications_sent=sent.get(d, 0), **fields))
+        d += timedelta(days=1)
+
+    status_counts = {s.value: 0 for s in ApplicationStatus}
+    for a in apps:
+        status_counts[a.status.value] += 1
+    return PublicTimeseries(generated_at=datetime.now(UTC), days=rows, status_counts=status_counts)

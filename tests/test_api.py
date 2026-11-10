@@ -108,3 +108,25 @@ def test_insight_endpoint(client, auth):
     r = client.get("/v1/insights/scroll-vs-sleep", headers=auth)
     assert r.status_code == 200
     assert r.json()["days_compared"] == 0
+
+
+def test_public_timeseries_counts_only(client, auth, repo):
+    today = _today()
+    for company in ("Acme", "Globex"):
+        client.post("/v1/applications", json={"company": company, "role": "SDE"}, headers=auth)
+    repo.upsert_day(today - timedelta(days=1), {"sleep_minutes": 400, "steps": 9000})
+
+    r = client.get("/public/timeseries?days=7")
+    assert r.status_code == 200
+    body = r.json()
+    assert len(body["days"]) == 7  # gaps are filled
+    assert body["days"][-1]["day"] == today.isoformat()
+    assert body["days"][-1]["applications_sent"] == 2
+    assert body["days"][-2]["sleep_minutes"] == 400
+    assert body["status_counts"]["applied"] == 2
+    assert "Acme" not in r.text and "Globex" not in r.text
+
+
+def test_public_timeseries_range_limits(client):
+    assert client.get("/public/timeseries?days=3").status_code == 422
+    assert client.get("/public/timeseries?days=500").status_code == 422

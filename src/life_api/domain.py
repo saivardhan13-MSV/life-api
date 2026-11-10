@@ -84,15 +84,18 @@ class DaySummary(BaseModel):
     doomscroll_minutes: float | None = None
 
 
+class JobHunt(BaseModel):
+    """Public job-search signal: a daily habit, never counts, companies or outcomes."""
+
+    applied_today: bool
+    streak_days: int = Field(description="Consecutive days with at least one application.")
+
+
 class PublicSummary(BaseModel):
-    """Aggregates only: safe to show to anyone. No company names, no raw health data."""
+    """Aggregates only: safe to show to anyone. No application counts, no company names."""
 
     generated_at: datetime
-    applications_total: int
-    applications_today: int
-    applications_this_week: int
-    applications_last_30_days: int
-    interviews_total: int
+    job_hunt: JobHunt
     last_night_sleep_hours: float | None
     avg_sleep_hours_7d: float | None
     avg_steps_7d: int | None
@@ -123,10 +126,10 @@ class PublicDay(BaseModel):
     resting_heart_rate: int | None = None
     screen_minutes: float | None = None
     doomscroll_minutes: float | None = None
-    applications_sent: int = 0
+    applied: bool = False
 
 
 class PublicTimeseries(BaseModel):
     generated_at: datetime
+    job_hunt: JobHunt
     days: list[PublicDay]
-    status_counts: dict[str, int]

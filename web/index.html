@@ -32,7 +32,7 @@
   <p class="intro">I built a serverless data platform on AWS that tracks my <strong>job search</strong>, <strong>sleep</strong>, <strong>activity</strong> and <strong>screen time</strong>. A Fitbit feeds the Google Health API, my phone reports app usage, and a daily pipeline lands everything in an S3 data lake. Only totals and averages are public.</p>
 
   <section class="tiles" aria-label="Headline numbers">
-    <div class="tile"><div class="k">Applications sent</div><div class="v" id="t-apps">–</div><div class="sub" id="t-apps-sub">&nbsp;</div></div>
+    <div class="tile"><div class="k">Job hunt today</div><div class="v" id="t-hunt">–</div><div class="sub" id="t-hunt-sub">&nbsp;</div></div>
     <div class="tile"><div class="k">Sleep last night</div><div class="v" id="t-sleep">–</div><div class="sub" id="t-sleep-sub">&nbsp;</div></div>
     <div class="tile"><div class="k">Avg steps · 7 days</div><div class="v" id="t-steps">–</div><div class="sub" id="t-steps-sub">&nbsp;</div></div>
     <div class="tile"><div class="k">Doomscrolling · 7-day avg</div><div class="v" id="t-scroll">–</div><div class="sub" id="t-scroll-sub">&nbsp;</div></div>
@@ -45,18 +45,6 @@
         <div class="legend" id="lg-sleep"></div>
       </div>
       <div class="chart" id="ch-sleep"></div>
-    </article>
-
-    <article class="card c8">
-      <div class="head">
-        <div><h2>Applications per day</h2><p class="desc">Jobs applied to, logged through the API</p></div>
-        <div class="big" id="apps-range">–</div>
-      </div>
-      <div class="chart" id="ch-apps"></div>
-    </article>
-    <article class="card c4">
-      <h2>Pipeline</h2><p class="desc">Where every application stands</p>
-      <div id="ch-funnel"></div>
     </article>
 
     <article class="card c6">
@@ -76,8 +64,16 @@
       <div class="chart" id="ch-screen"></div>
     </article>
     <article class="card c4">
+      <div class="head"><div><h2>Job hunt</h2><p class="desc">Did I apply somewhere that day? A habit, not a scoreboard</p></div></div>
+      <div id="hunt-badge" class="badge">–</div>
+      <p class="streak" id="hunt-streak">&nbsp;</p>
+      <div class="dots" id="hunt-dots" aria-label="Days with applications"></div>
+      <p class="desc" id="hunt-range" style="margin-top:10px">&nbsp;</p>
+    </article>
+
+    <article class="card c12">
       <h2>What the data says</h2><p class="desc">Computed from the selected range</p>
-      <div id="insights"></div>
+      <div id="insights" class="insights"></div>
     </article>
   </section>
 
@@ -96,7 +92,7 @@
 </div>
 
 <script type="module">
-import { barChart, lineChart, funnel, fmtDay } from "./charts.js";
+import { barChart, lineChart, fmtDay } from "./charts.js";
 
 const API = (window.LIFE_API_URL || "").replace(/\/$/, "");
 const $ = (id) => document.getElementById(id);
@@ -129,8 +125,9 @@ function render(ts, summary) {
   const n = days.length;
 
   // tiles
-  $("t-apps").textContent = summary.applications_total.toLocaleString();
-  $("t-apps-sub").innerHTML = `<b>${summary.applications_this_week}</b> this week · <b>${summary.interviews_total}</b> interviews`;
+  const hunt = summary.job_hunt;
+  $("t-hunt").innerHTML = hunt.applied_today ? `<span class="ok">✓</span> Done` : `Not yet`;
+  $("t-hunt-sub").innerHTML = hunt.streak_days ? `<b>${hunt.streak_days}-day</b> streak` : "Streak starts with the next application";
   $("t-sleep").innerHTML = summary.last_night_sleep_hours == null ? "–" : `${summary.last_night_sleep_hours}<small>h</small>`;
   $("t-sleep-sub").innerHTML = summary.avg_sleep_hours_7d == null ? "&nbsp;" : `7-day average <b>${summary.avg_sleep_hours_7d}h</b>`;
   $("t-steps").textContent = summary.avg_steps_7d == null ? "–" : summary.avg_steps_7d.toLocaleString();
@@ -142,27 +139,23 @@ function render(ts, summary) {
   // charts
   const minToH = (v) => `${Math.round(v / 60)}h`;
   barChart($("ch-sleep"), { days, series: SLEEP, fmt: hm, fmtY: minToH, height: 240, unit: 60, empty: "No sleep data in this range" });
-  barChart($("ch-apps"), { days, series: [{ key: "applications_sent", label: "Applications", color: C("--s1") }], fmt: (v) => v, fmtY: (v) => Math.round(v), height: 200, empty: "No applications logged in this range yet" });
-  const sent = days.reduce((a, d) => a + d.applications_sent, 0);
-  $("apps-range").textContent = `${sent} in ${n}d`;
-  const sc = ts.status_counts;
-  funnel($("ch-funnel"), {
-    color: C("--s1"),
-    rows: [
-      { label: "Applied", value: Object.values(sc).reduce((a, b) => a + b, 0) },
-      { label: "Screening", value: sc.screening + sc.interviewing + sc.offer },
-      { label: "Interviewing", value: sc.interviewing + sc.offer },
-      { label: "Offer", value: sc.offer },
-      { label: "Rejected", value: sc.rejected, muted: true },
-      { label: "Ghosted", value: sc.ghosted, muted: true },
-    ],
-  });
   barChart($("ch-steps"), { days, series: [{ key: "steps", label: "Steps", color: C("--s1") }], fmt: (v) => Math.round(v).toLocaleString(), fmtY: (v) => (v >= 1000 ? `${Math.round(v / 1000)}k` : v), height: 200 });
   const sAvg = avg(days.map((d) => d.steps));
   $("steps-avg").textContent = sAvg == null ? "–" : `${Math.round(sAvg).toLocaleString()} avg`;
   lineChart($("ch-rhr"), { days, key: "resting_heart_rate", label: "Resting HR", color: C("--s1"), fmt: (v) => `${v}`, height: 200 });
   const lastRhr = [...days].reverse().find((d) => d.resting_heart_rate != null);
   $("rhr-last").textContent = lastRhr ? `${lastRhr.resting_heart_rate} bpm` : "–";
+  // job hunt habit
+  const appliedDays = days.filter((d) => d.applied).length;
+  $("hunt-badge").className = `badge ${ts.job_hunt.applied_today ? "done" : ""}`;
+  $("hunt-badge").innerHTML = ts.job_hunt.applied_today ? "✓ Applied today" : "○ Not yet today";
+  $("hunt-streak").innerHTML = ts.job_hunt.streak_days
+    ? `Applied every day for <strong>${ts.job_hunt.streak_days}</strong> day${ts.job_hunt.streak_days > 1 ? "s" : ""}`
+    : "No active streak";
+  $("hunt-dots").innerHTML = days.map((d) =>
+    `<span class="dot ${d.applied ? "on" : ""}" title="${fmtDay(d.day, { weekday: "short", month: "short", day: "numeric" })}: ${d.applied ? "applied" : "no applications"}"></span>`).join("");
+  $("hunt-range").textContent = `Active on ${appliedDays} of the last ${n} days`;
+
   barChart($("ch-screen"), { days, series: SCREEN, fmt: hm, fmtY: minToH, height: 220, unit: 60, empty: "Screen time syncs from my Android app (coming soon)" });
 
   // insights
@@ -174,14 +167,14 @@ function render(ts, summary) {
   if (sleepAvg != null) items.push(["🌙", `Averaging <strong>${hm(sleepAvg)}</strong> of sleep across ${nights.length} nights; <strong>${short}</strong> under 6 hours.`]);
   if (deepPct != null) items.push(["🧠", `<strong>${Math.round(deepPct * 100)}%</strong> of sleep is deep sleep (typical adults: 13–23%).`]);
   if (sAvg != null) items.push(["👟", `<strong>${days.filter((d) => d.steps >= 8000).length}</strong> of ${days.filter((d) => d.steps != null).length} days hit 8,000+ steps.`]);
-  items.push(["💼", sent ? `<strong>${sent}</strong> applications in the last ${n} days.` : `Application tracking just went live, so counts start now.`]);
-  $("insights").innerHTML = items.map(([i, t]) => `<div class="insight" style="margin-bottom:12px"><div class="ico" aria-hidden="true">${i}</div><p>${t}</p></div>`).join("");
+  items.push(["💼", appliedDays ? `Applied for jobs on <strong>${appliedDays}</strong> of the last ${n} days.` : `Job-hunt tracking just went live.`]);
+  $("insights").innerHTML = items.map(([i, t]) => `<div class="insight"><div class="ico" aria-hidden="true">${i}</div><p>${t}</p></div>`).join("");
 
   // table
   const cols = [["Date", (d) => fmtDay(d.day, { month: "short", day: "numeric" })], ["Sleep", (d) => hm(d.sleep_minutes)],
     ["Deep", (d) => hm(d.deep)], ["REM", (d) => hm(d.rem)], ["Steps", (d) => d.steps?.toLocaleString() ?? "–"],
     ["Resting HR", (d) => d.resting_heart_rate ?? "–"], ["Screen", (d) => hm(d.screen_minutes)], ["Doomscroll", (d) => hm(d.doomscroll_minutes)],
-    ["Applications", (d) => d.applications_sent]];
+    ["Applied", (d) => (d.applied ? "✓" : "–")]];
   $("tbl").innerHTML = `<thead><tr>${cols.map(([h]) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${[...days].reverse().map((d) => `<tr>${cols.map(([, f]) => `<td>${f(d)}</td>`).join("")}</tr>`).join("")}</tbody>`;
   $("updated").textContent = `Updated ${new Date(ts.generated_at).toLocaleString()}`;
 }

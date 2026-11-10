@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 
 from life_api.domain import Application, ApplicationStatus, DaySummary
-from life_api.services.summary import build_public_summary, scroll_vs_sleep
+from life_api.services.summary import build_public_summary, job_hunt, scroll_vs_sleep
 
 TODAY = date(2026, 11, 12)  # a Thursday
 
@@ -19,20 +19,30 @@ def _app(days_ago: int, status=ApplicationStatus.APPLIED) -> Application:
     )
 
 
-def test_public_summary_counts():
-    apps = [_app(0), _app(0), _app(2), _app(5, ApplicationStatus.INTERVIEWING), _app(40)]
+def test_public_summary_has_habit_not_counts():
+    apps = [_app(0), _app(0), _app(1), _app(2), _app(5, ApplicationStatus.REJECTED)]
     days = [
         DaySummary(day=TODAY - timedelta(days=i), sleep_minutes=420, steps=8000) for i in range(7)
     ]
     s = build_public_summary(apps, days, TODAY)
-    assert s.applications_total == 5
-    assert s.applications_today == 2
-    assert s.applications_this_week == 3  # Mon 9th .. Thu 12th
-    assert s.applications_last_30_days == 4
-    assert s.interviews_total == 1
+    assert s.job_hunt.applied_today is True
+    assert s.job_hunt.streak_days == 3  # today, -1, -2; gap at -3
     assert s.avg_sleep_hours_7d == 7.0
     assert s.avg_steps_7d == 8000
-    assert s.avg_screen_hours_7d is None
+    dumped = s.model_dump_json()
+    for leaked in ("applications_total", "interviews", "rejected", "status"):
+        assert leaked not in dumped
+
+
+def test_streak_survives_until_you_log_today():
+    hunt = job_hunt([_app(1), _app(2)], TODAY)
+    assert hunt.applied_today is False
+    assert hunt.streak_days == 2
+
+
+def test_streak_zero_when_lapsed():
+    assert job_hunt([_app(3)], TODAY).streak_days == 0
+    assert job_hunt([], TODAY).streak_days == 0
 
 
 def test_scroll_vs_sleep_detects_penalty():

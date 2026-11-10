@@ -79,7 +79,7 @@ def test_screen_time_upload_merges_with_health(client, auth, repo, s3):
     assert keys == [f"clean/screen_time/dt={day.isoformat()}/data.jsonl"]
 
 
-def test_public_summary_has_no_company_names(client, auth, repo):
+def test_public_summary_has_no_company_names_or_counts(client, auth, repo):
     today = _today()
     for company in ("Acme", "Globex"):
         client.post("/v1/applications", json={"company": company, "role": "SDE"}, headers=auth)
@@ -88,10 +88,10 @@ def test_public_summary_has_no_company_names(client, auth, repo):
     r = client.get("/public/summary")
     assert r.status_code == 200
     body = r.json()
-    assert body["applications_total"] == 2
-    assert body["applications_today"] == 2
+    assert body["job_hunt"] == {"applied_today": True, "streak_days": 1}
     assert body["last_night_sleep_hours"] == 7.0
     assert "Acme" not in r.text and "Globex" not in r.text
+    assert "applications" not in r.text
     assert r.headers["cache-control"].startswith("public")
 
 
@@ -110,7 +110,7 @@ def test_insight_endpoint(client, auth):
     assert r.json()["days_compared"] == 0
 
 
-def test_public_timeseries_counts_only(client, auth, repo):
+def test_public_timeseries_yes_no_only(client, auth, repo):
     today = _today()
     for company in ("Acme", "Globex"):
         client.post("/v1/applications", json={"company": company, "role": "SDE"}, headers=auth)
@@ -121,10 +121,12 @@ def test_public_timeseries_counts_only(client, auth, repo):
     body = r.json()
     assert len(body["days"]) == 7  # gaps are filled
     assert body["days"][-1]["day"] == today.isoformat()
-    assert body["days"][-1]["applications_sent"] == 2
+    assert body["days"][-1]["applied"] is True
+    assert body["days"][-2]["applied"] is False
     assert body["days"][-2]["sleep_minutes"] == 400
-    assert body["status_counts"]["applied"] == 2
-    assert "Acme" not in r.text and "Globex" not in r.text
+    assert body["job_hunt"]["streak_days"] == 1
+    for leaked in ("Acme", "Globex", "applications_sent", "status", "rejected", "interview"):
+        assert leaked not in r.text
 
 
 def test_public_timeseries_range_limits(client):

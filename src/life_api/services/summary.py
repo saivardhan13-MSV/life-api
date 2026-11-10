@@ -7,15 +7,13 @@ from statistics import mean, median
 
 from life_api.domain import (
     Application,
-    ApplicationStatus,
     DaySummary,
+    JobHunt,
     PublicDay,
     PublicSummary,
     PublicTimeseries,
     ScrollSleepInsight,
 )
-
-INTERVIEW_STATUSES = {ApplicationStatus.INTERVIEWING, ApplicationStatus.OFFER}
 
 
 def _avg(values: list[float]) -> float | None:
@@ -26,10 +24,24 @@ def _hours(minutes: float | None) -> float | None:
     return round(minutes / 60, 1) if minutes is not None else None
 
 
+def job_hunt(apps: list[Application], today: date) -> JobHunt:
+    """Applied today? And for how many consecutive days?
+
+    The streak counts back from today, or from yesterday if nothing is logged yet
+    today, so it doesn't reset to zero every morning.
+    """
+    applied_days = {a.applied_on for a in apps}
+    day = today if today in applied_days else today - timedelta(days=1)
+    streak = 0
+    while day in applied_days:
+        streak += 1
+        day -= timedelta(days=1)
+    return JobHunt(applied_today=today in applied_days, streak_days=streak)
+
+
 def build_public_summary(
     apps: list[Application], days: list[DaySummary], today: date
 ) -> PublicSummary:
-    week_start = today - timedelta(days=today.weekday())  # Monday
     last7 = [d for d in days if today - timedelta(days=7) < d.day <= today]
     by_day = {d.day: d for d in days}
     last_night = by_day.get(today) or by_day.get(today - timedelta(days=1))
@@ -37,13 +49,7 @@ def build_public_summary(
     avg_steps = _avg([d.steps for d in last7 if d.steps is not None])
     return PublicSummary(
         generated_at=datetime.now(UTC),
-        applications_total=len(apps),
-        applications_today=sum(a.applied_on == today for a in apps),
-        applications_this_week=sum(week_start <= a.applied_on <= today for a in apps),
-        applications_last_30_days=sum(
-            today - timedelta(days=30) < a.applied_on <= today for a in apps
-        ),
-        interviews_total=sum(a.status in INTERVIEW_STATUSES for a in apps),
+        job_hunt=job_hunt(apps, today),
         last_night_sleep_hours=_hours(last_night.sleep_minutes) if last_night else None,
         avg_sleep_hours_7d=_hours(_avg([d.sleep_minutes for d in last7 if d.sleep_minutes])),
         avg_steps_7d=round(avg_steps) if avg_steps is not None else None,
@@ -110,21 +116,16 @@ def scroll_vs_sleep(days: list[DaySummary]) -> ScrollSleepInsight:
 def build_public_timeseries(
     apps: list[Application], days: list[DaySummary], start: date, end: date
 ) -> PublicTimeseries:
-    """Every calendar day in ``[start, end]`` (gaps included), plus a status funnel."""
+    """Every calendar day in ``[start, end]`` (gaps included). Applications are reduced
+    to a yes/no per day, so no counts, companies or outcomes ever leave the API."""
     by_day = {d.day: d for d in days}
-    sent: dict[date, int] = {}
-    for a in apps:
-        sent[a.applied_on] = sent.get(a.applied_on, 0) + 1
+    applied_days = {a.applied_on for a in apps}
 
     rows = []
     d = start
     while d <= end:
         known = by_day.get(d)
         fields = known.model_dump(exclude={"day"}) if known else {}
-        rows.append(PublicDay(day=d, applications_sent=sent.get(d, 0), **fields))
+        rows.append(PublicDay(day=d, applied=d in applied_days, **fields))
         d += timedelta(days=1)
-
-    status_counts = {s.value: 0 for s in ApplicationStatus}
-    for a in apps:
-        status_counts[a.status.value] += 1
-    return PublicTimeseries(generated_at=datetime.now(UTC), days=rows, status_counts=status_counts)
+    return PublicTimeseries(generated_at=datetime.now(UTC), job_hunt=job_hunt(apps, end), days=rows)

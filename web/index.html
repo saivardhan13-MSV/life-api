@@ -20,9 +20,9 @@
     </div>
     <div class="controls">
       <div class="seg" role="group" aria-label="Date range">
-        <button data-days="today">Today</button>
+        <button data-days="today" aria-pressed="true">Today</button>
         <button data-days="7">7D</button>
-        <button data-days="14" aria-pressed="true">14D</button>
+        <button data-days="14">14D</button>
         <button data-days="30">30D</button>
         <button data-days="90">90D</button>
       </div>
@@ -32,7 +32,7 @@
 
   <p class="intro">I built a serverless data platform on AWS that tracks my <strong>job search</strong>, <strong>sleep</strong>, <strong>activity</strong> and <strong>screen time</strong>. A Fitbit feeds the Google Health API, my phone reports app usage, and a daily pipeline lands everything in an S3 data lake. Only totals and averages are public.</p>
 
-  <section id="today-view" hidden>
+  <section id="today-view">
     <div class="today-head">
       <h2 id="tv-title">Today</h2>
       <p class="desc" id="tv-asof">&nbsp;</p>
@@ -68,7 +68,7 @@
     </div>
   </section>
 
-  <div id="range-view">
+  <div id="range-view" hidden>
   <section class="tiles" aria-label="Headline numbers">
     <div class="tile"><div class="k">Job hunt today</div><div class="v" id="t-hunt">–</div><div class="sub" id="t-hunt-sub">&nbsp;</div></div>
     <div class="tile"><div class="k">Sleep last night</div><div class="v" id="t-sleep">–</div><div class="sub" id="t-sleep-sub">&nbsp;</div></div>
@@ -293,7 +293,7 @@ document.querySelectorAll(".seg button").forEach((b) =>
     if (today) loadToday(); else load(Number(b.dataset.days));
   }),
 );
-load(14);
+loadToday();
 </script>
 </body>
 </html>

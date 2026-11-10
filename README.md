@@ -4,7 +4,7 @@
 
 My Fitbit feeds the Google Health API, my Android phone uploads screen time, and I log job applications through a REST API. A daily serverless pipeline lands everything in an S3 data lake, dbt models it in Athena, and a FastAPI service on Lambda serves it.
 
-> Live dashboard: `https://<cloudfront-id>.cloudfront.net` · API docs: `<api-url>/docs`
+> **Live dashboard:** https://d1q2i02h22615d.cloudfront.net · **API docs:** https://uzwc1ate00.execute-api.us-east-1.amazonaws.com/docs
 
 ---
 
@@ -14,7 +14,7 @@ My Fitbit feeds the Google Health API, my Android phone uploads screen time, and
 flowchart LR
   subgraph Sources
     FB[Fitbit Air] --> GH[Google Health API v4]
-    PH[Android phone<br/>screen time CSV]
+    PH[Android app<br/>UsageStatsManager, every 6h]
     ME[Me: job applications]
   end
 
@@ -59,6 +59,7 @@ flowchart LR
 
 ```http
 GET /public/summary                 # anyone: totals and averages only
+GET /public/timeseries?days=30      # anyone: daily series + status funnel (counts only)
 GET /v1/days?start=2026-11-01       # me: merged daily metrics
 GET /v1/insights/scroll-vs-sleep    # me: "do I sleep less after heavy-scroll days?"
 POST /v1/applications               # me: log an application
@@ -69,6 +70,12 @@ POST /v1/screen-time                # phone: per-app minutes for a day
 dbt marts:
 - **`fct_daily_life`**: one row per calendar day (sleep, stages, steps, resting HR, screen time, doomscrolling, applications sent, and the *next* night's sleep). Days without data still appear, so gaps in tracking are visible.
 - **`fct_application_funnel`**: weekly applications, responses, interviews and response rate.
+
+## Clients
+
+- **Public dashboard** (`web/index.html`): a dark analytics view with sleep stages, steps, resting heart rate, screen time, applications per day, the pipeline funnel and computed insights. Charts are hand-built SVG with hover tooltips and a table view, with no chart library.
+- **Private tracker** (`web/me.html`): unlocks with the API key, which is kept in `sessionStorage` only. Log, search, filter, update and delete applications.
+- **Android app** (`android/`): Kotlin + WorkManager. Reads per-app foreground time from `UsageStatsManager` events (sessions clipped to local midnight, launcher and system UI excluded) and posts it every 6 hours. CI builds the APK, so no local Android SDK is needed.
 
 ## Engineering decisions
 
@@ -83,6 +90,7 @@ dbt marts:
 ## Repo layout
 
 ```
+android/          Kotlin screen-time app (WorkManager + UsageStatsManager)
 src/life_api/
   api/            FastAPI app, routers, auth dependency
   ingest/         Google Health client, transforms, screen time, daily job
@@ -108,8 +116,9 @@ Deploying needs an AWS account and a Google Cloud OAuth client: see [docs/setup.
 
 ## Roadmap
 
+- [x] Dark analytics dashboard + private application tracker
+- [x] Android app that posts screen time automatically
 - [ ] **Generative art**: a daily image made from the day's data (sleep stages as color bands, steps as density, scrolling as noise), written to S3 and shown on the dashboard
 - [ ] **Weekly doomscroll report**: a scheduled Lambda that emails a summary via SES
-- [ ] Small Android app that reads `UsageStatsManager` and posts screen time automatically
 - [ ] Jobright CSV import
 - [ ] Local development against an AWS emulator (floci / LocalStack)

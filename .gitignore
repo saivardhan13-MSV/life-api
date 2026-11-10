@@ -27,3 +27,11 @@ dbt/life/dbt_packages/
 infra/terraform/tfplan
 .claude/
 web/config.js
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.apk

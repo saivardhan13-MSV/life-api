@@ -33,6 +33,7 @@ class ApplicationIn(BaseModel):
 
 class ApplicationUpdate(BaseModel):
     status: ApplicationStatus | None = None
+    applied_on: date | None = None
     notes: str | None = Field(default=None, max_length=2000)
 
 

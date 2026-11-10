@@ -132,3 +132,22 @@ def test_public_timeseries_yes_no_only(client, auth, repo):
 def test_public_timeseries_range_limits(client):
     assert client.get("/public/timeseries?days=3").status_code == 422
     assert client.get("/public/timeseries?days=500").status_code == 422
+
+
+def test_future_applied_on_is_rejected(client, auth):
+    tomorrow = (_today() + timedelta(days=1)).isoformat()
+    r = client.post(
+        "/v1/applications", json={"company": "A", "role": "B", "applied_on": tomorrow}, headers=auth
+    )
+    assert r.status_code == 422
+    assert "future" in r.json()["detail"]
+
+
+def test_applied_on_can_be_corrected(client, auth):
+    app = client.post("/v1/applications", json={"company": "A", "role": "B"}, headers=auth).json()
+    yesterday = (_today() - timedelta(days=1)).isoformat()
+    r = client.patch(f"/v1/applications/{app['id']}", json={"applied_on": yesterday}, headers=auth)
+    assert r.status_code == 200 and r.json()["applied_on"] == yesterday
+    tomorrow = (_today() + timedelta(days=1)).isoformat()
+    r = client.patch(f"/v1/applications/{app['id']}", json={"applied_on": tomorrow}, headers=auth)
+    assert r.status_code == 422

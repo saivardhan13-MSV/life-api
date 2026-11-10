@@ -23,6 +23,8 @@
   .apps td.num { text-align: right; }
   .apps select { background: var(--surface-2); border: 1px solid var(--ring); border-radius: 7px; padding: 4px 6px; color: var(--ink); }
   .co { color: var(--ink); font-weight: 600; }
+  .date-in { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 4px; color: var(--ink-2); color-scheme: dark; }
+  .date-in:hover, .date-in:focus { border-color: var(--ring); }
   .del { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px 6px; border-radius: 6px; }
   .del:hover { color: var(--critical); background: rgba(208, 59, 59, 0.1); }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #262624; border: 1px solid var(--ring); padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; display: none; z-index: 60; }
@@ -67,7 +69,7 @@
         <label class="field w3">Company<input name="company" required maxlength="200"></label>
         <label class="field w3">Role<input name="role" required maxlength="200" placeholder="e.g. Data Engineer I"></label>
         <label class="field w2">Location<input name="location" maxlength="200" placeholder="Remote · Seattle, WA"></label>
-        <label class="field w2">Applied on<input name="applied_on" type="date"></label>
+        <label class="field w2">Applied on<input name="applied_on" id="applied-on" type="date"></label>
         <label class="field w2">Source
           <select name="source"><option>jobright</option><option>linkedin</option><option>company site</option><option>referral</option><option>other</option></select>
         </label>
@@ -143,7 +145,7 @@ function render() {
   const shown = apps.filter((a) => (!fs || a.status === fs) && (!q || `${a.company} ${a.role}`.toLowerCase().includes(q)));
   $("rows").innerHTML = shown.length ? shown.map((a) => `
     <tr>
-      <td>${esc(a.applied_on)}</td>
+      <td><input class="date-in" type="date" value="${esc(a.applied_on)}" max="${today()}" data-date="${a.id}" aria-label="Applied date for ${esc(a.company)}"></td>
       <td class="co">${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.company)}</a>` : esc(a.company)}</td>
       <td>${esc(a.role)}</td>
       <td>${esc(a.location || "–")}</td>
@@ -159,6 +161,8 @@ function render() {
   $("m-rate").textContent = apps.length ? `${Math.round((moved / apps.length) * 100)}%` : "–";
 }
 
+function resetDate() { const d = $("applied-on"); d.max = today(); d.value = today(); }
+resetDate();
 $("f-status").innerHTML += STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
 $("unlock").addEventListener("submit", (e) => { e.preventDefault(); unlock($("key").value.trim()); });
 $("logout").addEventListener("click", lock);
@@ -170,11 +174,19 @@ $("add").addEventListener("submit", async (e) => {
   const body = Object.fromEntries([...new FormData(e.target)].filter(([, v]) => String(v).trim() !== ""));
   try {
     const app = await api("/v1/applications", { method: "POST", body: JSON.stringify(body) });
-    apps.unshift(app); e.target.reset(); render(); toast(`Added ${app.company}`);
+    apps.unshift(app); e.target.reset(); resetDate(); render(); toast(`Added ${app.company}`);
   } catch (err) { toast(err.message); }
 });
 
 $("rows").addEventListener("change", async (e) => {
+  const dateId = e.target.dataset.date;
+  if (dateId) {
+    try {
+      const app = await api(`/v1/applications/${dateId}`, { method: "PATCH", body: JSON.stringify({ applied_on: e.target.value }) });
+      apps = apps.map((a) => (a.id === dateId ? app : a)); render(); toast(`${app.company}: date set to ${app.applied_on}`);
+    } catch (err) { toast(err.message); render(); }
+    return;
+  }
   const id = e.target.dataset.id; if (!id) return;
   try {
     const app = await api(`/v1/applications/${id}`, { method: "PATCH", body: JSON.stringify({ status: e.target.value }) });

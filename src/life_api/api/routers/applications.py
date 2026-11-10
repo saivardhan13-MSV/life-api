@@ -13,8 +13,20 @@ from life_api.storage.dynamo import NotFoundError
 router = APIRouter(prefix="/v1/applications", tags=["applications"])
 
 
+def _reject_future(applied_on: date | None, settings: SettingsDep) -> None:
+    """Dates are in the app's timezone. A future date usually means the client's
+    clock is in a different timezone; fail loudly instead of storing it."""
+    today = settings.today()
+    if applied_on and applied_on > today:
+        raise HTTPException(
+            422,
+            f"applied_on {applied_on} is in the future; today is {today} ({settings.timezone})",
+        )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_application(body: ApplicationIn, repo: RepoDep, settings: SettingsDep) -> Application:
+    _reject_future(body.applied_on, settings)
     now = datetime.now(UTC)
     app = Application(
         **body.model_dump(exclude={"applied_on"}),
@@ -50,9 +62,12 @@ def get_application(app_id: str, repo: RepoDep) -> Application:
 
 
 @router.patch("/{app_id}")
-def update_application(app_id: str, body: ApplicationUpdate, repo: RepoDep) -> Application:
-    if body.status is None and body.notes is None:
+def update_application(
+    app_id: str, body: ApplicationUpdate, repo: RepoDep, settings: SettingsDep
+) -> Application:
+    if body.status is None and body.notes is None and body.applied_on is None:
         raise HTTPException(422, "Nothing to update")
+    _reject_future(body.applied_on, settings)
     try:
         return repo.update_application(app_id, body, datetime.now(UTC).isoformat())
     except NotFoundError:

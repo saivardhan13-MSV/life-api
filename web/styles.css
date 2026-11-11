@@ -155,6 +155,9 @@ footer { margin-top: 28px; color: var(--muted); font-size: 0.8rem; display: flex
 
 /* api box */
 .api-box { margin-top: 12px; }
+.api-box summary { color: var(--muted); font-size: 0.85rem; }
+.api-box summary:hover { color: var(--ink-2); }
+.api-body { padding: 0 18px 16px; }
 .term { margin: 6px 0 4px; background: var(--page); border: 1px solid var(--ring); border-radius: 10px; padding: 14px 16px; font: 0.82rem/1.55 var(--mono); color: var(--ink-2); overflow-x: auto; white-space: pre; }
 .term .prompt { color: var(--good); }
 .term .out { display: block; margin-top: 10px; color: var(--ink); white-space: pre; }

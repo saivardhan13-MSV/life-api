@@ -124,17 +124,20 @@
   </details>
   </div>
 
-  <section class="card api-box" aria-labelledby="api-h">
-    <div class="head">
-      <div><h2 id="api-h">This page is an API</h2><p class="desc">Everything above comes from one public endpoint. Run it yourself.</p></div>
-      <div class="controls">
-        <button class="btn primary" id="run-api" type="button">Run it</button>
-        <a class="btn" id="api-docs" href="#">API docs ↗</a>
+  <details class="api-box" id="api-box">
+    <summary>View the raw API response</summary>
+    <div class="api-body">
+      <div class="head">
+        <p class="desc" style="margin:0">Everything on this page comes from this public endpoint.</p>
+        <div class="controls">
+          <button class="btn primary" id="run-api" type="button">Run again</button>
+          <a class="btn" id="api-docs" href="#">API docs ↗</a>
+        </div>
       </div>
+      <pre class="term"><span class="prompt">$</span> curl <span id="api-url"></span>/public/summary
+<code id="api-out" class="out">…</code></pre>
     </div>
-    <pre class="term"><span class="prompt">$</span> curl <span id="api-url"></span>/public/summary
-<code id="api-out" class="out">Press "Run it" to call the live API.</code></pre>
-  </section>
+  </details>
 
   <footer>
     <div class="chips">
@@ -354,7 +357,10 @@ document.querySelectorAll(".seg button").forEach((b) =>
 );
 $("api-url").textContent = API;
 $("api-docs").href = `${API}/docs`;
-$("run-api").addEventListener("click", async () => {
+// Opening the toggle calls the live API once; "Run again" repeats it.
+$("api-box").addEventListener("toggle", () => { if ($("api-box").open && $("api-out").textContent === "…") runApi(); });
+$("run-api").addEventListener("click", runApi);
+async function runApi() {
   const out = $("api-out");
   out.textContent = "…";
   const t0 = performance.now();
@@ -367,7 +373,7 @@ $("run-api").addEventListener("click", async () => {
   } catch (e) {
     out.textContent = "Request failed. The API may be cold-starting; try again.";
   }
-});
+}
 loadToday();
 </script>
 </body>

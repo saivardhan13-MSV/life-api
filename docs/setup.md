@@ -94,3 +94,12 @@ curl -X POST "$API/v1/applications" -H "X-API-Key: $KEY" -H "Content-Type: appli
 - **Git Bash on Windows rewrites `/life-api/...` into a file path** (you'll see `ParameterNotFound`). Prefix AWS commands with `MSYS_NO_PATHCONV=1`, or use PowerShell.
 - **`KMS validation error ... Key does not exist` creating DynamoDB:** some accounts have a broken `aws/dynamodb` managed key. The table here uses DynamoDB's default AWS-owned encryption, so this doesn't apply anymore.
 - **Windows "path too long" during `pip install` or the Lambda build:** keep the repo in a short path, or set `LIFE_BUILD_DIR` to a short folder.
+
+## Pause and resume
+
+Set `paused = true` in `infra/terraform/terraform.tfvars`, then `terraform plan -out=tfplan` and `terraform apply tfplan`.
+Paused means the ingest schedule is disabled, the CloudFront site is disabled, the API rejects every request (HTTP 429)
+and alarms send nothing. All data (DynamoDB, S3) and configuration are kept, and idle cost is about $0.
+
+To resume: set `paused = false`, plan and apply again, then re-run `scripts/google_health_auth.py` if the Google
+token expired while paused, and backfill with `{"backfill_days": N}`.

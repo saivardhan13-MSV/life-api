@@ -21,7 +21,7 @@ resource "aws_cloudfront_origin_access_control" "site" {
 }
 
 resource "aws_cloudfront_distribution" "site" {
-  enabled             = true
+  enabled             = !var.paused
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
   comment             = "${local.name} public dashboard"

@@ -23,6 +23,7 @@ resource "aws_cloudwatch_metric_alarm" "ingest_errors" {
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
+  actions_enabled     = !var.paused
 }
 
 # Missing data is also a failure: no successful invocation in 2 days.
@@ -38,6 +39,7 @@ resource "aws_cloudwatch_metric_alarm" "ingest_not_running" {
   comparison_operator = "LessThanThreshold"
   treat_missing_data  = "breaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
+  actions_enabled     = !var.paused
 }
 
 resource "aws_cloudwatch_metric_alarm" "api_5xx" {
@@ -52,6 +54,7 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
+  actions_enabled     = !var.paused
 }
 
 resource "aws_cloudwatch_metric_alarm" "api_latency" {
@@ -66,6 +69,7 @@ resource "aws_cloudwatch_metric_alarm" "api_latency" {
   comparison_operator = "GreaterThanThreshold"
   treat_missing_data  = "notBreaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
+  actions_enabled     = !var.paused
 }
 
 resource "aws_budgets_budget" "monthly" {

@@ -178,8 +178,9 @@ resource "aws_apigatewayv2_stage" "default" {
 
   # A public endpoint can be hammered; throttling caps both abuse and cost.
   default_route_settings {
-    throttling_burst_limit = 20
-    throttling_rate_limit  = 10
+    # Paused: a limit of 0 rejects every request (HTTP 429), so nothing can run up a bill.
+    throttling_burst_limit = var.paused ? 0 : 20
+    throttling_rate_limit  = var.paused ? 0 : 10
   }
 
   access_log_settings {
@@ -231,6 +232,8 @@ resource "aws_scheduler_schedule" "daily_ingest" {
   name                         = "${local.name}-daily-ingest"
   schedule_expression          = "cron(0 */3 * * ? *)" # every 3h local: yesterday final + today so far
   schedule_expression_timezone = var.timezone
+
+  state = var.paused ? "DISABLED" : "ENABLED"
 
   flexible_time_window {
     mode = "OFF"

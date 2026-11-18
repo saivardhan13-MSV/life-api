@@ -47,6 +47,12 @@ variable "create_github_oidc_provider" {
   default     = true
 }
 
+variable "paused" {
+  description = "true = stop the ingest schedule, take the site offline, block the API and silence alarms. Data is kept."
+  type        = bool
+  default     = false
+}
+
 variable "extra_cors_origins" {
   description = "Extra origins allowed to call the API (e.g. http://localhost:8000 for local dashboard dev)."
   type        = list(string)

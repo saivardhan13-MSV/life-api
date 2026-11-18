@@ -1,7 +1,8 @@
 name: dbt build
 
-# Runs after the 09:00 ingest. GitHub-hosted runners are free for public repos,
+# Daily rebuild of the dbt models. GitHub-hosted runners are free for public repos,
 # so the transformation layer costs nothing beyond Athena's per-query pennies.
+# Skips (instead of failing) until the AWS_DBT_ROLE_ARN secret is configured.
 on:
   schedule:
     - cron: "0 15 * * *" # 15:00 UTC
@@ -12,7 +13,19 @@ permissions:
   contents: read
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.c.outputs.ready }}
+    steps:
+      - id: c
+        run: |
+          if [ -n "${{ secrets.AWS_DBT_ROLE_ARN }}" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "ready=false" >> "$GITHUB_OUTPUT"; echo "::notice::AWS_DBT_ROLE_ARN not set; skipping dbt."; fi
+
   dbt:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
